@@ -13,6 +13,8 @@ TEST_SRC=""
 BRUTE_SRC=""
 TESTGEN_SRC=""
 
+TESTS_DIR="./tests/"
+
 print_version() {
     echo "algre version 1.0.0"
     echo "Author: Jakub Stachowicz"
@@ -49,10 +51,98 @@ incorrect_directory() {
 }
 
 read_options() {
-    shift $1
+    shift "$1"
     echo "N_OPTS: $#"
     for option in "$@"; do
         echo "Option: $option"
+    done
+}
+
+compile() {
+    if [ "$1" != "$2" ]; then
+        if ! g++ "$1" -O2 -o "$2"; then
+            echo "Failed to compile $1."
+            exit 1
+        fi
+    fi
+}
+
+fix_paths() {
+    if [[ ! $TEST_SRC =~ ^\./ ]]; then
+        TEST_SRC="./"$TEST_SRC
+    fi
+    if [[ ! $BRUTE_SRC =~ ^\./ ]]; then
+        BRUTE_SRC="./"$BRUTE_SRC
+    fi
+    if [[ ! $TESTGEN_SRC =~ ^\./ ]]; then
+        TESTGEN_SRC="./"$TESTGEN_SRC
+    fi
+}
+
+run_1_file_test() {
+    compile "$1" "$TEST_SRC"
+    fix_paths
+    echo "Testing \"$TEST_SRC\"..."
+        # if ! $TEST_SRC < /tmp/input.in > /tmp/test.out; then
+        #     echo "Tested solution failed to execute."
+        # fi
+}
+
+run_2_files_test() {
+    compile "$1" "$TEST_SRC"
+    compile "$2" "$BRUTE_SRC"
+    fix_paths
+    echo "Testing \"$TEST_SRC\" against brute force \"$BRUTE_SRC\"..."
+        # if ! $BRUTE_SRC < /tmp/input.in > /tmp/brute.out; then
+        #     echo "Brute force failed to execute."
+        # fi
+        # if ! $TEST_SRC < /tmp/input.in > /tmp/test.out; then
+        #     echo "Tested solution failed to execute."
+        # fi
+}
+
+run_3_files_test() {
+    compile "$1" "$TEST_SRC"
+    compile "$2" "$BRUTE_SRC"
+    compile "$3" "$TESTGEN_SRC"
+    fix_paths
+    echo "Testing \"$TEST_SRC\" against brute force \"$BRUTE_SRC\""
+    echo "and with test generator \"$TESTGEN_SRC\"..."
+    for ((i=1; i<=1000000; i++)); do
+        printf "Test %s\t" "$i"
+        if ! $TESTGEN_SRC $i > /tmp/input.in; then
+            rm -f /tmp/input.in
+            printf "\nTest generator failed to execute.\n"
+            exit 1
+        fi
+        if ! $BRUTE_SRC < /tmp/input.in > /tmp/brute.out; then
+            rm -f /tmp/input.in
+            rm -f /tmp/brute.out
+            printf "\nBrute force failed to execute.\n"
+            exit 1
+        fi
+        if ! $TEST_SRC < /tmp/input.in > /tmp/test.out; then
+            rm -f /tmp/input.in
+            rm -f /tmp/brute.out
+            rm -f /tmp/test.out
+            printf "\nTested solution failed to execute.\n"
+            exit 1
+        fi
+        if ! diff /tmp/test.out /tmp/brute.out > /dev/null; then
+            echo "FAILED"
+            if [ ! -d "$(dirname "$TEST_SRC")/algre_failed_test" ]; then
+                mkdir "$(dirname "$TEST_SRC")/algre_failed_test"
+            fi
+            mv /tmp/test.out "$(dirname "$TEST_SRC")/algre_failed_test/test.out"
+            mv /tmp/brute.out "$(dirname "$TEST_SRC")/algre_failed_test/brute.out"
+            mv /tmp/input.in "$(dirname "$TEST_SRC")/algre_failed_test/input.in"
+            exit 1
+        else
+            echo "OK!"
+            rm -f /tmp/input.in
+            rm -f /tmp/brute.out
+            rm -f /tmp/test.out
+        fi
     done
 }
 
@@ -66,7 +156,8 @@ elif [ $# -eq 1 ]; then
         print_help
     elif [ -f "$1" ]; then
         # 1 file
-        echo "jej"
+        TEST_SRC=$(echo "$1" | sed -E 's/\.cpp$//g')
+        run_1_file_test "$1"
     else
         incorrect_directory "$1"
     fi
@@ -75,29 +166,38 @@ elif [ $# -eq 2 ]; then
         incorrect_directory "$1"
     elif [ ! -f "$2" ]; then
         # 1 file + 1 option
-        echo "jej"
+        TEST_SRC=$(echo "$1" | sed -E 's/\.cpp$//g')
         read_options 2 "$@"
+        run_1_file_test "$1"
     else
         # 2 files
-        echo "jej2"
+        TEST_SRC=$(echo "$1" | sed -E 's/\.cpp$//g')
+        BRUTE_SRC=$(echo "$2" | sed -E 's/\.cpp$//g')
+        run_2_files_test "$1" "$2"
     fi
 elif [ $# -ge 3 ]; then
     if [ ! -f "$1" ]; then
         incorrect_directory "$1"
     elif [ ! -f "$2" ]; then
         # 1 file + options
-        echo "jej"
+        TEST_SRC=$(echo "$1" | sed -E 's/\.cpp$//g')
         read_options 2 "$@"
+        run_1_file_test "$1"
     elif [ ! -f "$3" ]; then
         # 2 file + options
-        echo "jej2"
+        TEST_SRC=$(echo "$1" | sed -E 's/\.cpp$//g')
+        BRUTE_SRC=$(echo "$2" | sed -E 's/\.cpp$//g')
         read_options 3 "$@"
+        run_2_files_test "$1" "$2"
     else
         # 3 files...
-        echo "jej3"
+        TEST_SRC=$(echo "$1" | sed -E 's/\.cpp$//g')
+        BRUTE_SRC=$(echo "$2" | sed -E 's/\.cpp$//g')
+        TESTGEN_SRC=$(echo "$3" | sed -E 's/\.cpp$//g')
         if [ $# -gt 3 ]; then
             # ... + options
             read_options 4 "$@"
         fi
+        run_3_files_test "$1" "$2" "$3"
     fi
 fi
