@@ -24,8 +24,7 @@ print_help() {
     printf "Usage:\t./algre.sh file(s) [options]...\n"
     echo "Default directory containing tests is $TESTS_DIR."
     echo "It should have 2 subfolders $TESTS_DIR""in/ and $TESTS_DIR""out/"
-    echo "containing *.in files and *.out files,"
-    echo "where * should be numbers."
+    echo "containing *.in files and *.out files."
     echo "Files can be either executables, or source code."
     echo "If source code is provided, it will be compiled using g++"
     printf "(use g++ --help for more details).\n\n"
@@ -87,9 +86,37 @@ run_1_file_test() {
     compile "$1" "$TEST_SRC"
     fix_paths
     echo "Testing \"$TEST_SRC\"..."
-        # if ! $TEST_SRC < /tmp/input.in > /tmp/test.out; then
-        #     echo "Tested solution failed to execute."
-        # fi
+    LS_RESULT=$(ls "$TESTS_DIR""in/")
+    for TEST_FILE in $LS_RESULT; do
+        if [[ ! $TEST_FILE =~ \.in$ ]]; then
+            continue
+        fi
+        TEST_FILE_OUT=$(echo "$TEST_FILE" | sed -E 's/\.in$//g')".out"
+        if [ ! -f "$TESTS_DIR""out/$TEST_FILE_OUT" ]; then
+            continue
+        fi
+        printf "Test %s\t" "$TEST_FILE"
+        if ! $TEST_SRC < "$TESTS_DIR""in/$TEST_FILE" > /tmp/test.out; then
+            rm -f /tmp/test.out
+            printf "\nTested solution failed to execute.\n"
+            exit 1
+        fi
+        if ! diff /tmp/test.out "$TESTS_DIR""out/$TEST_FILE_OUT" > /dev/null; then
+            echo "FAILED"
+            if [ -d "$(dirname "$TEST_SRC")/algre_failed_test" ]; then
+                rm -rf "$(dirname "$TEST_SRC")/algre_failed_test"
+            fi
+            mkdir "$(dirname "$TEST_SRC")/algre_failed_test"
+            mv /tmp/test.out "$(dirname "$TEST_SRC")/algre_failed_test/test.out"
+            cp "$TESTS_DIR""out/$TEST_FILE_OUT" "$(dirname "$TEST_SRC")/algre_failed_test/$TEST_FILE_OUT"
+            cp "$TESTS_DIR""in/$TEST_FILE" "$(dirname "$TEST_SRC")/algre_failed_test/$TEST_FILE"
+            exit 1
+        else
+            echo "OK!"
+            rm -f /tmp/brute.out
+            rm -f /tmp/test.out
+        fi
+    done
 }
 
 run_2_files_test() {
@@ -116,11 +143,13 @@ run_2_files_test() {
         fi
         if ! diff /tmp/test.out /tmp/brute.out > /dev/null; then
             echo "FAILED"
-            if [ ! -d "$(dirname "$TEST_SRC")/algre_failed_test" ]; then
-                mkdir "$(dirname "$TEST_SRC")/algre_failed_test"
+            if [ -d "$(dirname "$TEST_SRC")/algre_failed_test" ]; then
+                rm -rf "$(dirname "$TEST_SRC")/algre_failed_test"
             fi
+            mkdir "$(dirname "$TEST_SRC")/algre_failed_test"
             mv /tmp/test.out "$(dirname "$TEST_SRC")/algre_failed_test/test.out"
             mv /tmp/brute.out "$(dirname "$TEST_SRC")/algre_failed_test/brute.out"
+            cp "$TESTS_DIR""in/$TEST_FILE" "$(dirname "$TEST_SRC")/algre_failed_test/$TEST_FILE"
             exit 1
         else
             echo "OK!"
@@ -159,9 +188,10 @@ run_3_files_test() {
         fi
         if ! diff /tmp/test.out /tmp/brute.out > /dev/null; then
             echo "FAILED"
-            if [ ! -d "$(dirname "$TEST_SRC")/algre_failed_test" ]; then
-                mkdir "$(dirname "$TEST_SRC")/algre_failed_test"
+            if [ -d "$(dirname "$TEST_SRC")/algre_failed_test" ]; then
+                rm -rf "$(dirname "$TEST_SRC")/algre_failed_test"
             fi
+            mkdir "$(dirname "$TEST_SRC")/algre_failed_test"
             mv /tmp/test.out "$(dirname "$TEST_SRC")/algre_failed_test/test.out"
             mv /tmp/brute.out "$(dirname "$TEST_SRC")/algre_failed_test/brute.out"
             mv /tmp/input.in "$(dirname "$TEST_SRC")/algre_failed_test/input.in"
