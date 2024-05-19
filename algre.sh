@@ -21,11 +21,11 @@ print_version() {
 }
 
 print_help() {
-    printf "Usage:\t./algre.sh file(s) [options]...\n"
+    printf "Usage:\t./algre.sh file(s) [options]...\n\n"
     echo "Default directory containing tests is $TESTS_DIR."
     echo "It should have 2 subfolders $TESTS_DIR""in/ and $TESTS_DIR""out/"
     echo "containing *.in files and *.out files."
-    echo "Files can be either executables, or source code."
+    echo "File(s) can be either executable(s), or source code."
     echo "If source code is provided, it will be compiled using g++"
     printf "(use g++ --help for more details).\n\n"
 
