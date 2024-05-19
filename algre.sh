@@ -15,11 +15,13 @@ TESTGEN_SRC=""
 
 TESTS_DIR="./tests/"
 
+# Print version and author information
 print_version() {
     echo "algre version 1.0.0"
     echo "Author: Jakub Stachowicz"
 }
 
+# Print help menu with usages and option
 print_help() {
     printf "Usage:\t./algre.sh file(s) [options]...\n\n"
     echo "Default directory containing tests is $TESTS_DIR."
@@ -43,16 +45,27 @@ print_help() {
     echo "  none (for now)."
 }
 
+# End the execution with an error (incorrect option given)
 incorrect_option() {
-    echo "Incorrect option: $1"
+    echo "Incorrect option: \"$1\""
     exit 1
 }
 
+# End the execution with an error (incorrect file path given)
+incorrect_file() {
+    echo "Incorrect file path: \"$1\""
+    exit 1
+}
+
+# End the execution with an error (incorrect directory given)
 incorrect_directory() {
-    echo "Incorrect file directory: $1"
+    echo "Incorrect directory: \"$1\""
     exit 1
 }
 
+# Read and parse options provided by user
+# First arg is the number of args (containing not relevant data) to shift
+# Second arg is script exec arguments
 read_options() {
     shift "$1"
     echo "N_OPTS: $#"
@@ -61,6 +74,8 @@ read_options() {
     done
 }
 
+# Compile the file in the source code $1 to the executable $2
+# (only if the $1 and $2 are different, preventing from compiling the executable)
 compile() {
     if [ "$1" != "$2" ]; then
         if ! g++ "$1" -O2 -o "$2"; then
@@ -70,6 +85,7 @@ compile() {
     fi
 }
 
+# Fix paths by adding ./ in front 
 fix_paths() {
     if [[ ! $TEST_SRC =~ ^\./ ]]; then
         TEST_SRC="./"$TEST_SRC
@@ -82,6 +98,7 @@ fix_paths() {
     fi
 }
 
+# Run tests of solution ($1) with tests provided in tests directory
 run_1_file_test() {
     compile "$1" "$TEST_SRC"
     fix_paths
@@ -119,6 +136,8 @@ run_1_file_test() {
     done
 }
 
+# Run tests of solution ($1) with input data provided in tests directory
+# comparing with correct output brute force solution ($2)
 run_2_files_test() {
     compile "$1" "$TEST_SRC"
     compile "$2" "$BRUTE_SRC"
@@ -159,6 +178,8 @@ run_2_files_test() {
     done
 }
 
+# Run tests of solution ($1) with input data provided by test generator ($3)
+# comparing with correct output brute force solution ($2)
 run_3_files_test() {
     compile "$1" "$TEST_SRC"
     compile "$2" "$BRUTE_SRC"
@@ -205,6 +226,7 @@ run_3_files_test() {
     done
 }
 
+# Script block used to differentiate between different modes
 if [ $# -eq 0 ]; then
     printf "Usage:\t./algre.sh file(s) [options]...\n"
     printf "Help:\t./algre.sh -h\n"
@@ -218,11 +240,11 @@ elif [ $# -eq 1 ]; then
         TEST_SRC=$(echo "$1" | sed -E 's/\.cpp$//g')
         run_1_file_test "$1"
     else
-        incorrect_directory "$1"
+        incorrect_file "$1"
     fi
 elif [ $# -eq 2 ]; then
     if [ ! -f "$1" ]; then
-        incorrect_directory "$1"
+        incorrect_file "$1"
     elif [ ! -f "$2" ]; then
         # 1 file + 1 option
         TEST_SRC=$(echo "$1" | sed -E 's/\.cpp$//g')
@@ -236,7 +258,7 @@ elif [ $# -eq 2 ]; then
     fi
 elif [ $# -ge 3 ]; then
     if [ ! -f "$1" ]; then
-        incorrect_directory "$1"
+        incorrect_file "$1"
     elif [ ! -f "$2" ]; then
         # 1 file + options
         TEST_SRC=$(echo "$1" | sed -E 's/\.cpp$//g')
