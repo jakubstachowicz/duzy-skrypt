@@ -27,6 +27,7 @@ RANGE_R=-1
 print_version() {
     echo "algre version 1.0.0"
     echo "Author: Jakub Stachowicz"
+    exit 0
 }
 
 # Print help menu with usages and option
@@ -51,60 +52,74 @@ print_help() {
 
     echo "Options:"
     echo "  none (for now)."
+    exit 0
 }
 
-# End the execution with an error (incorrect option given)
+# End the execution with an error (incorrect option given, $1 is the wrong option)
 incorrect_option() {
     echo "Incorrect option: \"$1\"."
     exit 1
 }
 
-# End the execution with an error (incorrect file path given)
+# End the execution with an error (incorrect file path given, $1 is the wrong path)
 incorrect_file() {
     echo "Incorrect file path: \"$1\"."
     exit 1
 }
 
-# End the execution with an error (incorrect directory given)
+# End the execution with an error (incorrect directory given, $1 is the wrong directory)
 incorrect_directory() {
     echo "Incorrect directory: \"$1\"."
     exit 1
 }
 
-# End the execution with an error (no number(s) given)
+# End the execution with an error (no number(s) given, $1 is the option chosen)
 no_number() {
     echo "Number(s) not given after option \"$1\"."
     exit 1
 }
 
-# End the execution with an error (no directory given)
+# End the execution with an error (no directory given, $1 is the option chosen)
 no_directory() {
     echo "Directory not given after option \"$1\"."
     exit 1
 }
 
-# Read and parse options provided by user
-# First arg is the number of args (containing not relevant data) to shift
-# Second arg is script exec arguments
+# Checks if the first argument ($1) is a nonnegative number, if isn't - end the execution
+is_nonnegative_number() {
+    if [[ ! "$1" =~ ^[0-9]+$ ]]; then
+        echo "Not a number: \"$1\"."
+        exit 1
+    fi
+}
+
+# Checks if the first argument ($1) is less or equal comapered
+# to the second argument ($2), if isn't - end the execution
+is_less_or_equal() {
+    if [ "$1" -le "$2" ]; then
+        echo "$2 is less than $1."
+        exit 1
+    fi
+}
+
+# Read and parse options provided by the user
+# First arg ($1) is the number of args (containing not relevant data) to shift
+# Second arg ($2) should be the script exec arguments
 read_options() {
     shift "$1"
     local OPTIONS=("$@")
     local N_OPTIONS=${#OPTIONS[@]}
-    local SKIP=0
-    local DIR_OR_NUMBER=""
     local LAST_OPTION=""
-    echo "$N_OPTIONS"
+    # Number of options to skip in the main loop (if one options needs e.g. a number after it)
+    local SKIP=0 
     for ((i=0; i<N_OPTIONS; i++)); do
         local OPTION=${OPTIONS[i]}
         if [ $SKIP -ne 0 ]; then
             SKIP=$((SKIP-1))
-            echo "Skippin: $OPTION" 
         elif [ "$OPTION" == "-h" ]; then
             print_help
-            exit 0
         elif [ "$OPTION" == "-v" ]; then
             print_version
-            exit 0
         elif [ "$OPTION" == "-t" ]; then
             TIME=1
         elif [ "$OPTION" == "-O3" ]; then
@@ -120,7 +135,7 @@ read_options() {
             if (( i+1 < N_OPTIONS )); then
                 RANGE_L=${OPTIONS[i+1]}
                 RANGE_R=${OPTIONS[i+1]}
-                # TODO NUMBER CHECKING
+                is_nonnegative_number "$RANGE_L"
             else
                 no_number "$OPTION"
             fi
@@ -145,7 +160,9 @@ read_options() {
             if (( i+2 < N_OPTIONS )); then
                 RANGE_L=${OPTIONS[i+1]}
                 RANGE_R=${OPTIONS[i+2]}
-                # TODO NUMBER CHECKING
+                is_nonnegative_number "$RANGE_L"
+                is_nonnegative_number "$RANGE_R"
+                is_less_or_equal "$RANGE_L" "$RANGE_R"
             else
                 no_number "$OPTION"
             fi
@@ -156,7 +173,7 @@ read_options() {
         LAST_OPTION=$OPTION
     done
     if [ $SKIP -ne 0 ]; then
-        if [ "$DIR_OR_NUMBER" == "DIR" ]; then
+        if [ "$LAST_OPTION" == "-dir" ]; then
             no_directory "$LAST_OPTION"
         else
             no_number "$LAST_OPTION"
@@ -167,15 +184,50 @@ read_options() {
 # Compile the file in the source code $1 to the executable $2
 # (only if the $1 and $2 are different, preventing from compiling the executable)
 compile() {
-    if [ "$1" != "$2" ]; then
-        if ! g++ "$1" -O2 -o "$2"; then
+    if [ "$1" == "$2" ]; then
+        return 0
+    fi
+    if [ $O3 -eq 0 ] && [ $WARN -eq 0 ]; then
+        if ! g++ "$1" -o "$2"; then
             echo "Failed to compile \"$1\"."
             exit 1
         fi
     fi
+    # In this section of code, O3, WARN, or all of them are true
+    local WARN_FLAGS=(
+        "-pedantic"
+        "-Wall"
+        "-Wextra"
+        "-Wmissing-declarations"
+        "-Wmissing-include-dirs"
+        "-Wshadow"
+        "-Werror"
+    )
+    if [ $WARN -eq 0 ]; then
+        # Since WARN if false, O3 must be true
+        if ! g++ "$1" -O3 -o "$2"; then
+            echo "Failed to compile \"$1\"."
+            exit 1
+        fi
+    else
+        if [ $O3 -eq 0 ]; then
+            # WARN true, no O3
+            if ! g++ "$1" "${WARN_FLAGS[@]}" -o "$2"; then
+                echo "Failed to compile \"$1\"."
+                exit 1
+            fi
+        else  
+            # Both options true
+            WARN_FLAGS+=("-O3")
+            if ! g++ "$1" "${WARN_FLAGS[@]}" -o "$2"; then
+                echo "Failed to compile \"$1\"."
+                exit 1
+            fi
+        fi
+    fi
 }
 
-# Fix paths by adding ./ in front 
+# Fix paths by adding ./ in front (to make execution possible)
 fix_paths() {
     if [[ ! $TEST_SRC =~ ^\./ ]]; then
         TEST_SRC="./"$TEST_SRC
@@ -188,7 +240,7 @@ fix_paths() {
     fi
 }
 
-# Run tests of solution ($1) with tests provided in tests directory
+# Run tests of the solution ($1) with tests provided in the tests directory
 run_1_file_test() {
     compile "$1" "$TEST_SRC"
     fix_paths
@@ -231,8 +283,8 @@ run_1_file_test() {
     done
 }
 
-# Run tests of solution ($1) with input data provided in tests directory
-# comparing with correct output brute force solution ($2)
+# Run tests of the solution ($1) with input data provided in the tests directory
+# comparing with the correct output brute force solution ($2)
 run_2_files_test() {
     compile "$1" "$TEST_SRC"
     compile "$2" "$BRUTE_SRC"
@@ -278,8 +330,8 @@ run_2_files_test() {
     done
 }
 
-# Run tests of solution ($1) with input data provided by test generator ($3)
-# comparing with correct output brute force solution ($2)
+# Run tests of the solution ($1) with input data provided by the test generator ($3)
+# comparing with the correct output brute force solution ($2)
 run_3_files_test() {
     compile "$1" "$TEST_SRC"
     compile "$2" "$BRUTE_SRC"
@@ -326,11 +378,13 @@ run_3_files_test() {
     done
 }
 
-# Script block used to differentiate between different modes
+# Script block used to differentiate between different modes of operation
 if [ $# -eq 0 ]; then
+    # Small message about the script if no args are given
     printf "Usage:\t./algre.sh file(s) [options]...\n"
     printf "Help:\t./algre.sh -h\n"
 elif [ $# -eq 1 ]; then
+    # 1 argument could be either 1 file mode or 1 option mode (-h, -v)
     if [ "$1" == "-v" ]; then
         print_version
     elif [ "$1" == "-h" ]; then
@@ -343,6 +397,7 @@ elif [ $# -eq 1 ]; then
         incorrect_file "$1"
     fi
 elif [ $# -eq 2 ]; then
+    # 2 arguments could be either 2 file mode, 1 file mode with 1 option
     if [ ! -f "$1" ]; then
         incorrect_file "$1"
     elif [ ! -f "$2" ]; then
@@ -357,6 +412,8 @@ elif [ $# -eq 2 ]; then
         run_2_files_test "$1" "$2"
     fi
 elif [ $# -ge 3 ]; then
+    # 3 arguments could be either 3 file mode with 0 or more options,
+    # 2 file mode with 1 or more options, and 1 file mode with 2 or more options
     if [ ! -f "$1" ]; then
         incorrect_file "$1"
     elif [ ! -f "$2" ]; then
