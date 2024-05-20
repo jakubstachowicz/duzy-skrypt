@@ -5,7 +5,6 @@
 # Last Modified On      : 19.05.2024 
 # Version               : 1.0.0
 # External Dependencies : g++ (optional, for compiling source code option)
-#                         vscode (optional, for quicker developement using vscode's tasks)
 # Description           : README.md
 # Licensed under MIT License (see LICENSE)
 
@@ -16,10 +15,8 @@ TESTGEN_SRC=""
 TESTS_DIR="./tests/"
 
 TIME=0
-TLIMIT=0
 O3=0
 WARN=0
-VSC=0
 RANGE_L=-1
 RANGE_R=-1
 
@@ -32,26 +29,49 @@ print_version() {
 
 # Print help menu with usages and option
 print_help() {
-    printf "Usage:\t./algre.sh file(s) [options]...\n\n"
+    printf "Usage:\t./algre.sh program(s) [options]...\n\n"
     echo "Default directory containing tests is $TESTS_DIR."
     echo "It should have 2 subfolders $TESTS_DIR""in/ and $TESTS_DIR""out/"
     echo "containing *.in files and *.out files."
-    echo "File(s) can be either executable(s), or source code."
+    echo "Programs(s) can be either executable(s), or source code."
     echo "If source code is provided, it will be compiled using g++"
     printf "(use g++ --help for more details).\n\n"
 
-    echo "No files:"
+    echo "No programs passed:"
     printf "  -h\tHelp (this menu).\n"
     printf "  -v\tVersion information.\n"
-    echo "With files:"
+    echo "With programs passed:"
     printf "  1st\tWill be interpreted as the solution to be tested.\n"
-    printf "  2nd\tWill be interpreted as the correct answers generator.\n"
-    printf "  3rd\tWill be interpreted as the input generator.\n"
+    printf "  2nd\tWill be interpreted as the correct answers generator (optional).\n"
+    printf "  3rd\tWill be interpreted as the input generator (optional).\n"
     printf "     \tIt should take one parameter, an integer,\n"
     printf "     \tused to seed the random number generator.\n\n"
 
     echo "Options:"
-    echo "  none (for now)."
+    printf "  -h\tHelp (this menu).\n"
+    printf "  -v\tVersion information.\n"
+    printf "  -t\tTime the solution with \`time\`.\n"
+    printf "  -r\tRange of tests to be tested.\n"
+    printf "    \t2 nonnegative whole numbers forming\n"
+    printf "    \ta correct range should follow.\n"
+    printf "    \tIn 1- and 2-program mode works only\n"
+    printf "    \twith test names being numbers\n"
+    printf "    \t(with correct extention, .in or .out).\n"
+    printf "  -nr\tSame as range but tests with only one test.\n"
+    printf "     \t1 nonnegative whole number should follow.\n"
+    printf "  -dir\tChange the tests path from the default.\n"
+    printf "      \tPath to the tests directory should follow.\n"
+    printf "  -O3\tCompile with -O3 flag\n"
+    printf "     \t(use g++ --help for more details).\n"
+    printf "  -warn\tCompile with the following warning flags:\n"
+    printf "       \t-pedantic,\n"
+    printf "       \t-Wall,\n"
+    printf "       \t-Wextra,\n"
+    printf "       \t-Wmissing-declarations,\n"
+    printf "       \t-Wmissing-include-dirs,\n"
+    printf "       \t-Wshadow,\n"
+    printf "       \t-Werror\n"
+    printf "       \t(use g++ --help for more details).\n"
     exit 0
 }
 
@@ -96,7 +116,7 @@ is_nonnegative_number() {
 # Checks if the first argument ($1) is less or equal comapered
 # to the second argument ($2), if isn't - end the execution
 is_less_or_equal() {
-    if [ "$1" -le "$2" ]; then
+    if [ "$2" -lt "$1" ]; then
         echo "$2 is less than $1."
         exit 1
     fi
@@ -126,10 +146,6 @@ read_options() {
             O3=1
         elif [ "$OPTION" == "-warn" ]; then
             WARN=1
-        elif [ "$OPTION" == "-vsc" ]; then
-            VSC=1
-        elif [ "$OPTION" == "-tlim" ]; then
-            TLIMIT=1
         elif [ "$OPTION" == "-nr" ]; then
             SKIP=1
             if (( i+1 < N_OPTIONS )); then
@@ -245,7 +261,7 @@ run_1_file_test() {
     compile "$1" "$TEST_SRC"
     fix_paths
     echo "Testing \"$TEST_SRC\"..."
-    local LS_RESULT
+    local LS_RESULT  # Stores all input files
     LS_RESULT=$(ls "$TESTS_DIR""in/" 2> /dev/null)
     if [ $? -ne 0 ]; then
         echo "Tests not found!" 
@@ -255,18 +271,41 @@ run_1_file_test() {
         if [[ ! $TEST_FILE =~ \.in$ ]]; then
             continue
         fi
+        if [ $RANGE_L -ne -1 ]; then
+            # Test if the test is in range
+            local TEST_NUMBER
+            TEST_NUMBER=$(echo "$TEST_FILE" | sed -E 's/\.in$//g')
+            if [[ ! "$TEST_NUMBER" =~ ^[0-9]+$ ]]; then
+                continue
+            fi
+            if [ $TEST_NUMBER -lt $RANGE_L ] || [ $TEST_NUMBER -gt $RANGE_R ]; then
+                continue
+            fi
+        fi
+        local TEST_FILE_OUT
         TEST_FILE_OUT=$(echo "$TEST_FILE" | sed -E 's/\.in$//g')".out"
         if [ ! -f "$TESTS_DIR""out/$TEST_FILE_OUT" ]; then
             continue
         fi
         printf "Test %s\t" "$TEST_FILE"
-        if ! $TEST_SRC < "$TESTS_DIR""in/$TEST_FILE" > /tmp/test.out; then
-            rm -f /tmp/test.out
-            printf "\nTested solution failed to execute.\n"
-            exit 1
+        # Test the program with or without the time option
+        if [[ $TIME -eq 1 ]]; then
+            if ! time $TEST_SRC < "$TESTS_DIR""in/$TEST_FILE" > /tmp/test.out; then
+                rm -f /tmp/test.out
+                printf "\nTested solution failed to execute.\n"
+                exit 1
+            fi
+        else
+            if ! $TEST_SRC < "$TESTS_DIR""in/$TEST_FILE" > /tmp/test.out; then
+                rm -f /tmp/test.out
+                printf "\nTested solution failed to execute.\n"
+                exit 1
+            fi
         fi
+        # Check if the answer is correct
         if ! diff /tmp/test.out "$TESTS_DIR""out/$TEST_FILE_OUT" > /dev/null; then
             echo "FAILED"
+            # Create a directory with failed test for further investigation
             if [ -d "$(dirname "$TEST_SRC")/algre_failed_test" ]; then
                 rm -rf "$(dirname "$TEST_SRC")/algre_failed_test"
             fi
@@ -290,7 +329,7 @@ run_2_files_test() {
     compile "$2" "$BRUTE_SRC"
     fix_paths
     echo "Testing \"$TEST_SRC\" against brute force \"$BRUTE_SRC\"..."
-    local LS_RESULT
+    local LS_RESULT  # Stores all input files
     LS_RESULT=$(ls "$TESTS_DIR""in/" 2> /dev/null)
     if [ $? -ne 0 ]; then
         echo "Tests not found!" 
@@ -300,20 +339,44 @@ run_2_files_test() {
         if [[ ! $TEST_FILE =~ \.in$ ]]; then
             continue
         fi
+        if [ $RANGE_L -ne -1 ]; then
+            # Test if the test is in range
+            local TEST_NUMBER
+            TEST_NUMBER=$(echo "$TEST_FILE" | sed -E 's/\.in$//g')
+            if [[ ! "$TEST_NUMBER" =~ ^[0-9]+$ ]]; then
+                continue
+            fi
+            if [ $TEST_NUMBER -lt $RANGE_L ] || [ $TEST_NUMBER -gt $RANGE_R ]; then
+                continue
+            fi
+        fi
         printf "Test %s\t" "$TEST_FILE"
         if ! $BRUTE_SRC < "$TESTS_DIR""in/$TEST_FILE" > /tmp/brute.out; then
             rm -f /tmp/brute.out
             printf "\nBrute force failed to execute.\n"
             exit 1
         fi
-        if ! $TEST_SRC < "$TESTS_DIR""in/$TEST_FILE" > /tmp/test.out; then
-            rm -f /tmp/brute.out
-            rm -f /tmp/test.out
-            printf "\nTested solution failed to execute.\n"
-            exit 1
+        # Test the program with or without the time option
+        if [[ $TIME -eq 1 ]]; then
+            if ! time $TEST_SRC < "$TESTS_DIR""in/$TEST_FILE" > /tmp/test.out; then
+                rm -f /tmp/brute.out
+                rm -f /tmp/test.out
+                printf "\nTested solution failed to execute.\n"
+                exit 1
+            fi
+        else
+            if ! $TEST_SRC < "$TESTS_DIR""in/$TEST_FILE" > /tmp/test.out; then
+                rm -f /tmp/brute.out
+                rm -f /tmp/test.out
+                printf "\nTested solution failed to execute.\n"
+                exit 1
+
+            fi
         fi
+        # Check if the answer is correct
         if ! diff /tmp/test.out /tmp/brute.out > /dev/null; then
             echo "FAILED"
+            # Create a directory with failed test for further investigation
             if [ -d "$(dirname "$TEST_SRC")/algre_failed_test" ]; then
                 rm -rf "$(dirname "$TEST_SRC")/algre_failed_test"
             fi
@@ -339,7 +402,12 @@ run_3_files_test() {
     fix_paths
     echo "Testing \"$TEST_SRC\" against brute force \"$BRUTE_SRC\""
     echo "and with test generator \"$TESTGEN_SRC\"..."
-    for ((i=1; i<=1000000; i++)); do
+    # Default the range if not specified by the user
+    if [ $RANGE_L -eq -1 ]; then
+        RANGE_L=1
+        RANGE_R=100000
+    fi
+    for ((i=RANGE_L; i<=RANGE_R; i++)); do
         printf "Test %s\t" "$i"
         if ! $TESTGEN_SRC $i > /tmp/input.in; then
             rm -f /tmp/input.in
@@ -352,15 +420,28 @@ run_3_files_test() {
             printf "\nBrute force failed to execute.\n"
             exit 1
         fi
-        if ! $TEST_SRC < /tmp/input.in > /tmp/test.out; then
-            rm -f /tmp/input.in
-            rm -f /tmp/brute.out
-            rm -f /tmp/test.out
-            printf "\nTested solution failed to execute.\n"
-            exit 1
+        # Test the program with or without the time option
+        if [[ $TIME -eq 1 ]]; then
+            if ! time $TEST_SRC < /tmp/input.in > /tmp/test.out; then
+                rm -f /tmp/input.in
+                rm -f /tmp/brute.out
+                rm -f /tmp/test.out
+                printf "\nTested solution failed to execute.\n"
+                exit 1
+            fi
+        else
+            if ! $TEST_SRC < /tmp/input.in > /tmp/test.out; then
+                rm -f /tmp/input.in
+                rm -f /tmp/brute.out
+                rm -f /tmp/test.out
+                printf "\nTested solution failed to execute.\n"
+                exit 1
+            fi
         fi
+        # Check if the answer is correct
         if ! diff /tmp/test.out /tmp/brute.out > /dev/null; then
             echo "FAILED"
+            # Create a directory with failed test for further investigation
             if [ -d "$(dirname "$TEST_SRC")/algre_failed_test" ]; then
                 rm -rf "$(dirname "$TEST_SRC")/algre_failed_test"
             fi
