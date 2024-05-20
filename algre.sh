@@ -185,7 +185,6 @@ read_options() {
         else 
             incorrect_option "$OPTION"
         fi
-        echo "Current: $OPTION"
         LAST_OPTION=$OPTION
     done
     if [ $SKIP -ne 0 ]; then
