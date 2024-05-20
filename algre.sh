@@ -2,7 +2,7 @@
 # Author                : Jakub Stachowicz (s198302@student.pg.edu.pl)
 # Created On            : 18.05.2024
 # Last Modified By      : Jakub Stachowicz (s198302@student.pg.edu.pl)
-# Last Modified On      : 19.05.2024 
+# Last Modified On      : 20.05.2024 
 # Version               : 1.0.0
 # External Dependencies : g++ (optional, for compiling source code option)
 # Description           : README.md
@@ -267,6 +267,7 @@ run_1_file_test() {
         echo "Tests not found!" 
         exit 1
     fi
+    # Main for-each loop with input files
     for TEST_FILE in $LS_RESULT; do
         if [[ ! $TEST_FILE =~ \.in$ ]]; then
             continue
@@ -284,6 +285,7 @@ run_1_file_test() {
         fi
         local TEST_FILE_OUT
         TEST_FILE_OUT=$(echo "$TEST_FILE" | sed -E 's/\.in$//g')".out"
+        # Check if .out file exists
         if [ ! -f "$TESTS_DIR""out/$TEST_FILE_OUT" ]; then
             continue
         fi
@@ -335,6 +337,7 @@ run_2_files_test() {
         echo "Tests not found!" 
         exit 1
     fi
+    # Main for-each loop with input files
     for TEST_FILE in $LS_RESULT; do
         if [[ ! $TEST_FILE =~ \.in$ ]]; then
             continue
@@ -351,6 +354,7 @@ run_2_files_test() {
             fi
         fi
         printf "Test %s\t" "$TEST_FILE"
+        # Create out file
         if ! $BRUTE_SRC < "$TESTS_DIR""in/$TEST_FILE" > /tmp/brute.out; then
             rm -f /tmp/brute.out
             printf "\nBrute force failed to execute.\n"
@@ -407,13 +411,16 @@ run_3_files_test() {
         RANGE_L=1
         RANGE_R=100000
     fi
+    # Main loop with index as the random number generator seed
     for ((i=RANGE_L; i<=RANGE_R; i++)); do
         printf "Test %s\t" "$i"
+        # Create in file
         if ! $TESTGEN_SRC $i > /tmp/input.in; then
             rm -f /tmp/input.in
             printf "\nTest generator failed to execute.\n"
             exit 1
         fi
+        # Create out file
         if ! $BRUTE_SRC < /tmp/input.in > /tmp/brute.out; then
             rm -f /tmp/input.in
             rm -f /tmp/brute.out
