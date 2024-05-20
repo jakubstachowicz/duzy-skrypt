@@ -15,6 +15,14 @@ TESTGEN_SRC=""
 
 TESTS_DIR="./tests/"
 
+TIME=0
+TLIMIT=0
+O3=0
+WARN=0
+VSC=0
+RANGE_L=-1
+RANGE_R=-1
+
 # Print version and author information
 print_version() {
     echo "algre version 1.0.0"
@@ -47,19 +55,31 @@ print_help() {
 
 # End the execution with an error (incorrect option given)
 incorrect_option() {
-    echo "Incorrect option: \"$1\""
+    echo "Incorrect option: \"$1\"."
     exit 1
 }
 
 # End the execution with an error (incorrect file path given)
 incorrect_file() {
-    echo "Incorrect file path: \"$1\""
+    echo "Incorrect file path: \"$1\"."
     exit 1
 }
 
 # End the execution with an error (incorrect directory given)
 incorrect_directory() {
-    echo "Incorrect directory: \"$1\""
+    echo "Incorrect directory: \"$1\"."
+    exit 1
+}
+
+# End the execution with an error (no number(s) given)
+no_number() {
+    echo "Number(s) not given after option \"$1\"."
+    exit 1
+}
+
+# End the execution with an error (no directory given)
+no_directory() {
+    echo "Directory not given after option \"$1\"."
     exit 1
 }
 
@@ -68,10 +88,80 @@ incorrect_directory() {
 # Second arg is script exec arguments
 read_options() {
     shift "$1"
-    echo "N_OPTS: $#"
-    for option in "$@"; do
-        echo "Option: $option"
+    local OPTIONS=("$@")
+    local N_OPTIONS=${#OPTIONS[@]}
+    local SKIP=0
+    local DIR_OR_NUMBER=""
+    local LAST_OPTION=""
+    echo "$N_OPTIONS"
+    for ((i=0; i<N_OPTIONS; i++)); do
+        local OPTION=${OPTIONS[i]}
+        if [ $SKIP -ne 0 ]; then
+            SKIP=$((SKIP-1))
+            echo "Skippin: $OPTION" 
+        elif [ "$OPTION" == "-h" ]; then
+            print_help
+            exit 0
+        elif [ "$OPTION" == "-v" ]; then
+            print_version
+            exit 0
+        elif [ "$OPTION" == "-t" ]; then
+            TIME=1
+        elif [ "$OPTION" == "-O3" ]; then
+            O3=1
+        elif [ "$OPTION" == "-warn" ]; then
+            WARN=1
+        elif [ "$OPTION" == "-vsc" ]; then
+            VSC=1
+        elif [ "$OPTION" == "-tlim" ]; then
+            TLIMIT=1
+        elif [ "$OPTION" == "-nr" ]; then
+            SKIP=1
+            if (( i+1 < N_OPTIONS )); then
+                RANGE_L=${OPTIONS[i+1]}
+                RANGE_R=${OPTIONS[i+1]}
+                # TODO NUMBER CHECKING
+            else
+                no_number "$OPTION"
+            fi
+        elif [ "$OPTION" == "-dir" ]; then
+            SKIP=1
+            if (( i+1 < N_OPTIONS )); then
+                TESTS_DIR=${OPTIONS[i+1]}
+                if [ ! -d "$TESTS_DIR" ]; then
+                    incorrect_directory "$TESTS_DIR"
+                fi
+                if [[ ! $TESTS_DIR =~ /$ ]]; then
+                    TESTS_DIR="$TESTS_DIR""/"
+                fi
+                if [[ ! $TESTS_DIR =~ ^./ ]]; then
+                    TESTS_DIR="./""$TESTS_DIR"
+                fi
+            else
+                no_directory "$OPTION"
+            fi
+        elif [ "$OPTION" == "-r" ]; then
+            SKIP=2
+            if (( i+2 < N_OPTIONS )); then
+                RANGE_L=${OPTIONS[i+1]}
+                RANGE_R=${OPTIONS[i+2]}
+                # TODO NUMBER CHECKING
+            else
+                no_number "$OPTION"
+            fi
+        else 
+            incorrect_option "$OPTION"
+        fi
+        echo "Current: $OPTION"
+        LAST_OPTION=$OPTION
     done
+    if [ $SKIP -ne 0 ]; then
+        if [ "$DIR_OR_NUMBER" == "DIR" ]; then
+            no_directory "$LAST_OPTION"
+        else
+            no_number "$LAST_OPTION"
+        fi
+    fi
 }
 
 # Compile the file in the source code $1 to the executable $2
@@ -79,7 +169,7 @@ read_options() {
 compile() {
     if [ "$1" != "$2" ]; then
         if ! g++ "$1" -O2 -o "$2"; then
-            echo "Failed to compile $1."
+            echo "Failed to compile \"$1\"."
             exit 1
         fi
     fi
@@ -103,7 +193,12 @@ run_1_file_test() {
     compile "$1" "$TEST_SRC"
     fix_paths
     echo "Testing \"$TEST_SRC\"..."
-    LS_RESULT=$(ls "$TESTS_DIR""in/")
+    local LS_RESULT
+    LS_RESULT=$(ls "$TESTS_DIR""in/" 2> /dev/null)
+    if [ $? -ne 0 ]; then
+        echo "Tests not found!" 
+        exit 1
+    fi
     for TEST_FILE in $LS_RESULT; do
         if [[ ! $TEST_FILE =~ \.in$ ]]; then
             continue
@@ -143,7 +238,12 @@ run_2_files_test() {
     compile "$2" "$BRUTE_SRC"
     fix_paths
     echo "Testing \"$TEST_SRC\" against brute force \"$BRUTE_SRC\"..."
-    LS_RESULT=$(ls "$TESTS_DIR""in/")
+    local LS_RESULT
+    LS_RESULT=$(ls "$TESTS_DIR""in/" 2> /dev/null)
+    if [ $? -ne 0 ]; then
+        echo "Tests not found!" 
+        exit 1
+    fi
     for TEST_FILE in $LS_RESULT; do
         if [[ ! $TEST_FILE =~ \.in$ ]]; then
             continue
