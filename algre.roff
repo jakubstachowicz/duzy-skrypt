@@ -1,0 +1,122 @@
+.TH ALGRE.SH 1 "May 2024" "1.0.0" "Script for Solution Testing"
+
+.SH NAME
+algre.sh - Script for testing programs against input/output test cases and measuring performance.
+
+.SH SYNOPSIS
+.B ./algre.sh
+[\fIprogram(s)\fR] [\fIoptions\fR]...
+
+.SH DESCRIPTION
+The \fBalgre.sh\fR script is used to test a solution program against a set of predefined input/output test cases. It can also compile source code if provided, using \fBg++\fR. The default directory containing test cases is \fB./tests/\fR, with subdirectories \fB./tests/in/\fR for input files and \fB./tests/out/\fR for output files.
+
+.SH USAGE
+The script can be executed in several modes based on the arguments provided.
+
+.SS No Programs Passed
+If no programs are provided, the following options are available:
+.TP
+\fB-h\fR
+Display the help menu.
+.TP
+\fB-v\fR
+Display version information.
+
+.SS With Programs Passed
+When programs are provided, they are interpreted as follows:
+.IP "1."
+The first program is considered the solution to be tested.
+.IP "2."
+The second program (optional) is considered the correct answers generator.
+.IP "3."
+The third program (optional) is considered the input generator, which should accept an integer to seed the random number generator. The integer (seed) will be passed as the first argument to the input generator.
+
+.SH OPTIONS
+.TP
+\fB-h\fR
+Display the help menu.
+.TP
+\fB-v\fR
+Display version information.
+.TP
+\fB-t\fR
+Time the solution using the \fBtime\fR command.
+.TP
+\fB-r\fR
+Specify a range of tests to be tested. Requires two nonnegative whole numbers indicating the start and end of the range. This option only works if test names are numbers with correct extensions (\fB.in\fR or \fB.out\fR) in 1- and 2-program modes.
+.TP
+\fB-nr\fR
+Specify a single test to be run. Requires one nonnegative whole number indicating the test number.
+.TP
+\fB-dir\fR
+Change the default path to the tests directory. Requires the path to the new tests directory.
+.TP
+\fB-O3\fR
+Compile the program with the \fB-O3\fR optimization flag (see \fBg++ --help\fR for more details).
+.TP
+\fB-warn\fR
+Compile the program with the following warning flags: \fB-pedantic\fR, \fB-Wall\fR, \fB-Wextra\fR, \fB-Wmissing-declarations\fR, \fB-Wmissing-include-dirs\fR, \fB-Wshadow\fR, \fB-Werror\fR (see \fBg++ --help\fR for more details).
+
+.SH EXAMPLES
+.TP
+1. Display the help menu:
+.nf
+    ./algre.sh -h
+.fi
+
+.TP
+2. Run a solution against the default test cases:
+.nf
+    ./algre.sh my_solution
+.fi
+
+.TP
+3. Run a solution and compare it with a correct answers generator:
+.nf
+    ./algre.sh my_solution correct_generator
+.fi
+
+.TP
+4. Run a solution with a specific input generator:
+.nf
+    ./algre.sh my_solution correct_generator input_generator
+.fi
+
+.TP
+5. Run a solution with a specific range of tests:
+.nf
+    ./algre.sh my_solution -r 1 10
+.fi
+
+.TP
+6. Change the default test directory and run the solution:
+.nf
+    ./algre.sh my_solution -dir /path/to/new/tests
+.fi
+
+.TP
+7. Compile the solution with optimization and warnings:
+.nf
+    ./algre.sh my_solution -O3 -warn
+.fi
+
+.SH FILES
+.TP
+\fB./tests/in/\fR
+Directory containing input test files (\fB*.in\fR).
+.TP
+\fB./tests/out/\fR
+Directory containing output test files (\fB*.out\fR).
+
+.SH AUTHOR
+Written by Jakub Stachowicz.
+
+.SH REPORTING BUGS
+Report bugs to <s198302@student.pg.edu.pl>.
+
+.SH COPYRIGHT
+This software is licensed under the MIT License; see the source for copying conditions. There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+.SH SEE ALSO
+.TP
+\fBg++(1)\fR, \fBtime(1)\fR
